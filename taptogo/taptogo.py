@@ -22,15 +22,57 @@ class TapToGo(object):
         with wait_for_page_load(self.driver):
             self.driver.find_element_by_id('j_id0:tapwrapper:loginform:login-submit').click()
         
+        self.logged_in = True
+
         # Check for error message on failed login
         try:
             error_div = self.driver.find_element_by_css_selector('div.page-messages')
             if 'your login attempt has failed' in error_div.text.lower():
+                self.logged_in = False
                 return False
             else:
                 return True
         except NoSuchElementException:
             return True
+    
+    def describe_tap_cards(self):
+        if not self.logged_in:
+            raise Exception('You must log in before describing cards')
+        
+        # This page is at /TAPMyCards, but for some reason it 
+        # doesn't load correctly unless you click the link.
+        self.driver.get(self.base_url)
+        with wait_for_page_load(self.driver):
+            self.driver.find_element_by_link_text('My TAP cards').click()
+
+        cards_wrapper = self.driver.find_element_by_id('MyCards:tapwrapper:cardList').get_attribute('innerHTML')
+        soup = BeautifulSoup(cards_wrapper, "html.parser")
+        cards = []
+
+        for div in soup.findAll('div'):
+            if 'panel-card' in div.get('class', ''):
+                card = {}
+                for div in div.findAll('div'):
+                    if 'panel-heading' in div.get('class', ''):
+                        for h2 in div.findAll('h2'):
+                            card['name'] = h2.text.split('-')[0].strip()
+                    elif 'panel-collapse' in div.get('class', ''):
+                        if 'card-' in div['id'] and '-panel' in div['id']:
+                            card['id'] = div['id'].replace('card-', '').replace('-panel', '')
+                            card['balance'] = float(div.findAll('div')[0].findAll('h4')[0].findAll('span')[0].text.replace('$', ''))
+
+                            for link in div.findAll('a'):
+                                link_text = link.text.lower().strip()
+                                if link_text == 'add fare':
+                                    card['reload_url'] = self.base_url + link['href']
+                                elif link_text == 'view history':
+                                    card['history_url'] = self.base_url + link['href']
+                                elif link_text == 'report lost or stolen card':
+                                    card['cancel_url'] = self.base_url + link['href']
+                            
+                            cards.append(card)
+        self.cards = cards
+        return cards
 
 # http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
 class wait_for_page_load(object):
