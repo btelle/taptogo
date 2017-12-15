@@ -16,6 +16,7 @@ class TapToGo(object):
         self.driver.get(self.base_url)
 
     def login(self, email, password):
+        self.email = email
         self.driver.find_element_by_id('j_id0:tapwrapper:loginform:login-email').send_keys(email)
         self.driver.find_element_by_id('j_id0:tapwrapper:loginform:login-password').send_keys(password)
         
@@ -73,6 +74,71 @@ class TapToGo(object):
                             cards.append(card)
         self.cards = cards
         return cards
+    
+    def add_stored_value(self, amount, tap_card_id=None, reload_url=None, card_dict=None, card_name=None, card_num=None, card_exp_month=None, card_exp_year=None, card_cvv=None, confirmation_email=None):
+        if not card_dict and not card_num:
+            raise AttributeError('card_dict or card_num are required.')
+        
+        if not tap_card_id and not reload_url:
+            raise AttributeError('tap_card_id or reload_url are required.')
+
+        if not card_dict:
+            card_dict = {
+                'name': card_name,
+                'num': card_num,
+                'exp_month': card_exp_month,
+                'exp_year': card_exp_year,
+                'cvv': card_cvv
+            }
+        
+        if not confirmation_email:
+            confirmation_email = self.email
+        
+        if tap_card_id and not reload_url:
+            for card in self.cards:
+                if card['id'] == tap_card_id:
+                    reload_url = card['reload_url']
+        
+        if not reload_url:
+            raise AttributeError('Unknown card, use describe_cards or pass reload_url parameter')
+        
+        self.driver.get(reload_url)
+        self.driver.find_element_by_link_text('Add Stored Value').click()
+        self.driver.implicitly_wait(2)
+
+        self.driver.find_element_by_id('ShoppingCart:tapwrapper:j_id96:farevalue').send_keys(str(amount))
+        self.driver.find_element_by_id('ShoppingCart:tapwrapper:j_id96:j_id144').click()
+        self.driver.implicitly_wait(2)
+
+        self.driver.find_element_by_css_selector('.dropdown-toggle').click()
+        self.driver.implicitly_wait(2)
+
+        with wait_for_page_load(self.driver):
+            self.driver.find_element_by_link_text('Edit and Checkout').click()
+        
+        with wait_for_page_load(self.driver):
+            self.driver.find_element_by_id('j_id0:tapwrapper:j_id95:j_id96:j_id216:j_id218').find_elements_by_xpath('.//input')[1].click()
+        
+        cart_amt = self.driver.find_element_by_css_selector('span.total_value').text
+        if float(cart_amt) != float(amount):
+            raise Exception("Cart amount doesn't match [{} != {}]".format(cart_amt, amount))
+        
+        self.driver.find_element_by_id('exact_cardholder_name').send_keys(card_dict['name'])
+        self.driver.find_element_by_id('x_card_num').send_keys(card_dict['num'])
+        self.driver.find_element_by_id('x_exp_date').send_keys(str(card_dict['exp_month']) + str(card_dict['exp_year']))
+        self.driver.find_element_by_id('x_card_code').send_keys(card_dict['cvv'])
+        self.driver.find_element_by_id('cc_email').send_keys(confirmation_email)
+        
+        with wait_for_page_load(self.driver):
+            self.driver.find_element_by_xpath("//input[@name='commit']").click()
+        
+        try:
+            error_message = self.driver.find_element_by_css_selector('div.fieldErrorMessage').get_attribute('innerHTML')
+            raise Exception(error_message)
+        except NoSuchElementException:
+            if 'Your Order Has Been Submitted' in client.page_source:
+                return True
+        return False
 
 # http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
 class wait_for_page_load(object):
@@ -91,7 +157,7 @@ class wait_for_page_load(object):
     
     def wait_for(self, condition_function):
         start_time = time.time()
-        while time.time() < start_time + 3:
+        while time.time() < start_time + 30:
             if condition_function():
                 return True
             else:
