@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.support.ui import Select
 
 from bs4 import BeautifulSoup
 
@@ -75,7 +76,11 @@ class TapToGo(object):
         self.cards = cards
         return cards
     
-    def add_stored_value(self, amount, tap_card_id=None, reload_url=None, card_dict=None, card_name=None, card_num=None, card_exp_month=None, card_exp_year=None, card_cvv=None, confirmation_email=None):
+    def add_stored_value(self, amount, tap_card_id=None, reload_url=None,
+                         card_dict=None, card_name=None, card_num=None,
+                         card_exp_month=None, card_exp_year=None, card_cvv=None,
+                         confirmation_email=None, card_address=None, card_state=None,
+                         card_city=None, card_zip=None, card_country=None):
         if not card_dict and not card_num:
             raise AttributeError('card_dict or card_num are required.')
         
@@ -88,7 +93,12 @@ class TapToGo(object):
                 'num': card_num,
                 'exp_month': card_exp_month,
                 'exp_year': card_exp_year,
-                'cvv': card_cvv
+                'cvv': card_cvv,
+                'address': card_address,
+                'city': card_city,
+                'state': card_state,
+                'zip': card_zip,
+                'country': card_country
             }
         
         if not confirmation_email:
@@ -106,8 +116,8 @@ class TapToGo(object):
         self.driver.find_element_by_link_text('Add Stored Value').click()
         self.driver.implicitly_wait(2)
 
-        self.driver.find_element_by_id('ShoppingCart:tapwrapper:j_id96:farevalue').send_keys(str(amount))
-        self.driver.find_element_by_id('ShoppingCart:tapwrapper:j_id96:j_id144').click()
+        self.driver.find_element_by_id('ShoppingCart:tapwrapper:j_id98:farevalue').send_keys(str(amount))
+        self.driver.find_element_by_id('ShoppingCart:tapwrapper:j_id98:j_id146').click()
         self.driver.implicitly_wait(2)
 
         self.driver.find_element_by_css_selector('.dropdown-toggle').click()
@@ -117,7 +127,7 @@ class TapToGo(object):
             self.driver.find_element_by_link_text('Edit and Checkout').click()
         
         with wait_for_page_load(self.driver):
-            self.driver.find_element_by_id('j_id0:tapwrapper:j_id95:j_id96:j_id216:j_id218').find_elements_by_xpath('.//input')[1].click()
+            self.driver.find_elements_by_xpath("//input[@value='Complete Checkout']")[0].click()
         
         cart_amt = self.driver.find_element_by_css_selector('span.total_value').text
         if float(cart_amt) != float(amount):
@@ -127,6 +137,22 @@ class TapToGo(object):
         self.driver.find_element_by_id('x_card_num').send_keys(card_dict['num'])
         self.driver.find_element_by_id('x_exp_date').send_keys(str(card_dict['exp_month']) + str(card_dict['exp_year']))
         self.driver.find_element_by_id('x_card_code').send_keys(card_dict['cvv'])
+        
+        try:
+            self.driver.find_element_by_id('x_address').send(card_dict['address'])
+
+            state_select = Select(self.driver.find_element_by_id('x_state'))
+            state_select.select_by_visible_text(card_dict['state'])
+
+            self.driver.find_element_by_id('x_city').send(card_dict['city'])
+            self.driver.find_element_by_id('x_zip').send(card_dict['zip'])
+
+            country_select = Select(self.driver.find_element_by_id('x_country'))
+            country_select.select_by_visible_text(card_dict['country'])
+        except AttributeError:
+            # ignore errors caused by a stored address
+            pass
+
         self.driver.find_element_by_id('cc_email').send_keys(confirmation_email)
         
         with wait_for_page_load(self.driver):

@@ -13,7 +13,12 @@ class TestDescribeCards(unittest.TestCase):
             'num': '4444000000000000',
             'exp_month': '01',
             'exp_year': '20',
-            'cvv': 123
+            'cvv': 123,
+            'address': '732 Batcave Lane',
+            'city': 'Gotham',
+            'state': 'New York',
+            'zip': '10001',
+            'country': 'United States'
         }
 
         if len(self.cards) > 0:
@@ -36,7 +41,12 @@ class TestDescribeCards(unittest.TestCase):
                     card_num='4444000000000000',
                     card_exp_month='01',
                     card_exp_year='20',
-                    card_cvv=123
+                    card_cvv=123,
+                    card_address='732 Batcave Lane',
+                    card_city='Gotham',
+                    card_state='New York',
+                    card_zip='10001',
+                    card_country='United States'
                 )
             except Exception as e:
                 self.assertTrue(str(e) == 'Invalid credit card number' or "Cart amount doesn't match" in str(e))
